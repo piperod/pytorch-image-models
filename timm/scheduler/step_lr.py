@@ -48,10 +48,13 @@ class StepLRScheduler(Scheduler):
         self.warmup_lr_init = warmup_lr_init
         self.warmup_prefix = warmup_prefix
         if self.warmup_t:
+            print("entering this for some reason")
+            print(self.warmup_t)
             self.warmup_steps = [(v - warmup_lr_init) / self.warmup_t for v in self.base_values]
             super().update_groups(self.warmup_lr_init)
         else:
             self.warmup_steps = [1 for _ in self.base_values]
+
 
     def _get_lr(self, t: int) -> List[float]:
         if t < self.warmup_t:

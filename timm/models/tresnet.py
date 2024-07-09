@@ -1,3 +1,5 @@
+## hijacked this file to add the HMAX
+
 """
 TResNet: High Performance GPU-Dedicated Architecture
 https://arxiv.org/pdf/2003.13630.pdf
@@ -346,10 +348,11 @@ def tresnet_v2_l(pretrained=False, **kwargs) -> TResNet:
     model_args = dict(layers=[3, 4, 23, 3], width_factor=1.0, v2=True)
     return _create_tresnet('tresnet_v2_l', pretrained=pretrained, **dict(model_args, **kwargs))
 
-
 register_model_deprecations(__name__, {
     'tresnet_m_miil_in21k': 'tresnet_m.miil_in21k',
     'tresnet_m_448': 'tresnet_m.miil_in1k_448',
     'tresnet_l_448': 'tresnet_l.miil_in1k_448',
     'tresnet_xl_448': 'tresnet_xl.miil_in1k_448',
 })
+
+

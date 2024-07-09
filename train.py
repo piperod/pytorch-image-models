@@ -483,6 +483,10 @@ def main():
         **factory_kwargs,
         **args.model_kwargs,
     )
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    print("Number of parameters in the model:", num_params)
+    print(model)
     if args.head_init_scale is not None:
         with torch.no_grad():
             model.get_classifier().weight.mul_(args.head_init_scale)
@@ -1005,6 +1009,11 @@ def train_one_epoch(
             with amp_autocast():
                 output = model(input)
                 loss = loss_fn(output, target)
+                if torch.isnan(loss):
+                    print("NaN loss detected")
+                    print("Outputs: ", output)
+                    print("Labels: ", target)
+                    return
             if accum_steps > 1:
                 loss /= accum_steps
             return loss
@@ -1060,6 +1069,7 @@ def train_one_epoch(
 
         if update_idx % args.log_interval == 0:
             lrl = [param_group['lr'] for param_group in optimizer.param_groups]
+            print(lrl)
             lr = sum(lrl) / len(lrl)
 
             if args.distributed:
@@ -1077,6 +1087,14 @@ def train_one_epoch(
                     f'LR: {lr:.3e}  '
                     f'Data: {data_time_m.val:.3f} ({data_time_m.avg:.3f})'
                 )
+                # print(f'Train: {epoch} [{update_idx:>4d}/{updates_per_epoch} \n',
+                #     f'({100. * update_idx / (updates_per_epoch - 1):>3.0f}%)]  \n',
+                #     f'Loss: {losses_m.val:#.3g} ({losses_m.avg:#.3g})  \n',
+                #     f'Time: {update_time_m.val:.3f}s, {update_sample_count / update_time_m.val:>7.2f}/s  \n',
+                #     f'({update_time_m.avg:.3f}s, {update_sample_count / update_time_m.avg:>7.2f}/s)  \n',
+                #     f'LR: {lr}  \n',
+                #     f'Data: {data_time_m.val:.3f} ({data_time_m.avg:.3f})\n'
+# )
 
                 if args.save_images and output_dir:
                     torchvision.utils.save_image(
