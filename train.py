@@ -971,12 +971,17 @@ def train_one_epoch(
             mixup_fn.mixup_enabled = False
 
     second_order = hasattr(optimizer, 'is_second_order') and optimizer.is_second_order
+    second_order = False
+
     has_no_sync = hasattr(model, "no_sync")
     update_time_m = utils.AverageMeter()
     data_time_m = utils.AverageMeter()
     losses_m = utils.AverageMeter()
 
     model.train()
+    start_time = time.time()
+    readable_start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time))
+    print(f"Starting computation epoch at: {readable_start_time}")
 
     accum_steps = args.grad_accum_steps
     last_accum_steps = len(loader) % accum_steps
@@ -988,7 +993,42 @@ def train_one_epoch(
     data_start_time = update_start_time = time.time()
     optimizer.zero_grad()
     update_sample_count = 0
+
+    ### moved these such that they are not redefined every step
+    def _forward(accum_steps):
+        with amp_autocast():
+            output = model(input)
+            loss = loss_fn(output, target)
+        if accum_steps > 1:
+            loss /= accum_steps
+        return loss
+    
+
+    def _backward(_loss, need_update):
+        if loss_scaler is not None:
+            loss_scaler(
+                _loss,
+                optimizer,
+                clip_grad=args.clip_grad,
+                clip_mode=args.clip_mode,
+                parameters=model_parameters(model, exclude_head='agc' in args.clip_mode),
+                create_graph=second_order,
+                need_update=need_update,
+            )
+        else:
+            _loss.backward(create_graph=second_order)
+            if need_update:
+                if args.clip_grad is not None:
+                    utils.dispatch_clip_grad(
+                        model_parameters(model, exclude_head='agc' in args.clip_mode),
+                        value=args.clip_grad,
+                        mode=args.clip_mode,
+                    )
+                optimizer.step()
+    ### end forward and backward pass functions
+
     for batch_idx, (input, target) in enumerate(loader):
+
         last_batch = batch_idx == last_batch_idx
         need_update = last_batch or (batch_idx + 1) % accum_steps == 0
         update_idx = batch_idx // accum_steps
@@ -1005,48 +1045,13 @@ def train_one_epoch(
         # multiply by accum steps to get equivalent for full update
         data_time_m.update(accum_steps * (time.time() - data_start_time))
 
-        def _forward():
-            with amp_autocast():
-                output = model(input)
-                loss = loss_fn(output, target)
-                if torch.isnan(loss):
-                    print("NaN loss detected")
-                    print("Outputs: ", output)
-                    print("Labels: ", target)
-                    return
-            if accum_steps > 1:
-                loss /= accum_steps
-            return loss
-
-        def _backward(_loss):
-            if loss_scaler is not None:
-                loss_scaler(
-                    _loss,
-                    optimizer,
-                    clip_grad=args.clip_grad,
-                    clip_mode=args.clip_mode,
-                    parameters=model_parameters(model, exclude_head='agc' in args.clip_mode),
-                    create_graph=second_order,
-                    need_update=need_update,
-                )
-            else:
-                _loss.backward(create_graph=second_order)
-                if need_update:
-                    if args.clip_grad is not None:
-                        utils.dispatch_clip_grad(
-                            model_parameters(model, exclude_head='agc' in args.clip_mode),
-                            value=args.clip_grad,
-                            mode=args.clip_mode,
-                        )
-                    optimizer.step()
-
         if has_no_sync and not need_update:
             with model.no_sync():
-                loss = _forward()
-                _backward(loss)
+                loss = _forward(accum_steps)
+                _backward(loss,need_update)
         else:
-            loss = _forward()
-            _backward(loss)
+            loss = _forward(accum_steps)
+            _backward(loss,need_update)
 
         if not args.distributed:
             losses_m.update(loss.item() * accum_steps, input.size(0))
@@ -1069,7 +1074,6 @@ def train_one_epoch(
 
         if update_idx % args.log_interval == 0:
             lrl = [param_group['lr'] for param_group in optimizer.param_groups]
-            print(lrl)
             lr = sum(lrl) / len(lrl)
 
             if args.distributed:
@@ -1117,6 +1121,13 @@ def train_one_epoch(
 
     if hasattr(optimizer, 'sync_lookahead'):
         optimizer.sync_lookahead()
+
+    end_time = time.time()
+    readable_end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time))
+    elapsed_time = end_time - start_time
+    
+    print(f"Finished epoch at: {readable_end_time}")
+    print(f"Elapsed Time: {elapsed_time:.4f} seconds\n")
 
     return OrderedDict([('loss', losses_m.avg)])
 

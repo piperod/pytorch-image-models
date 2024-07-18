@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import scipy as sp
+import time
 
 from ._builder import build_model_with_cfg
 from ._manipulate import checkpoint_seq
@@ -255,42 +256,28 @@ class HMAX(nn.Module):
 
 
     def forward(self, x):
+        start = time.time()
         x = self.conv1(x)
-        check_for_nans(x, "conv1 output")
         x = self.batchnorm1(x)
-        check_for_nans(x, "batchnorm1 output")
-        
         x = F.max_pool2d(x, kernel_size=14, stride=1)
-        check_for_nans(x, "max_pool2d output")
 
         bypass = torch.cat([seq(x) for seq in self.s2b_seqs], dim=1)
-        check_for_nans(bypass, "bypass concat")
-        
         bypass = F.max_pool2d(bypass, kernel_size=12, stride=6)
-        check_for_nans(bypass, "bypass max_pool2d")
 
         x = self.s2_seq(x)
-        check_for_nans(x, "s2_seq output")
-        
         x = F.max_pool2d(x, kernel_size=12, stride=6)
-        check_for_nans(x, "s2 max_pool2d")
 
         x = self.s3_seq(x)
-        check_for_nans(x, "s3_seq output")
-        
         x = F.max_pool2d(x, 3, 1)
-        check_for_nans(x, "s3 max_pool2d")
 
         x = torch.flatten(x, start_dim=1)
         bypass = torch.flatten(bypass, start_dim=1)
 
         x = torch.cat([bypass, x], dim=1)
         del bypass
-        check_for_nans(x, "concatenated tensor")
 
         x = self.dummy_classifier(x)
-        check_for_nans(x, "dummy_classifier output")
-        
+
         return x    
 
 def checkpoint_filter_fn(state_dict, model: nn.Module):
@@ -318,6 +305,5 @@ def _create_HMAX(variant, pretrained=False, **kwargs):
 @register_model
 def hmax_full(pretrained=False, **kwargs) -> HMAX:
     """ HMAX """
-    print("calling register model successfully !")
-    model = _create_HMAX('hmax_full', pretrained=False, **kwargs)
+    model = _create_HMAX('hmax_full', pretrained=pretrained, **kwargs)
     return model
