@@ -191,7 +191,7 @@ class HMAX(nn.Module):
                                                 nn.ReLU(True)
                                                 )
 
-        self.classifier = nn.Sequential(
+        self.dummy_classifier = nn.Sequential(
                                         # nn.Dropout(0.5),
                                         nn.Linear(self.get_s4_in_channels(), self.hidden_dim),  # fc1
                                         # nn.Dropout(0.2),
@@ -238,7 +238,7 @@ class HMAX(nn.Module):
         x = torch.cat([bypass, x], dim=1)
         del bypass
 
-        x = self.classifier(x)
+        x = self.dummy_classifier(x)
 
         return x    
 
@@ -308,16 +308,14 @@ class HMAX_bypass(nn.Module):
         return s4_in
 
     def forward(self, x):
-        start = time.time()
         x = self.conv1(x)
         x = self.batchnorm1(x)
         x = F.max_pool2d(x, kernel_size=14, stride=1)
 
         x = torch.cat([seq(x) for seq in self.s2b_seqs], dim=1)
         x = F.max_pool2d(x, kernel_size=12, stride=6)
-
+        x = torch.flatten(x, start_dim=1)
         x = self.classifier(x)
-
         return x    
 
 def checkpoint_filter_fn(state_dict, model: nn.Module):
@@ -342,7 +340,17 @@ def _create_HMAX(variant, pretrained=False, **kwargs):
     )
 
 def _create_HMAX_bypass(variant, pretrained=False, **kwargs):
-    return HMAX_bypass(**kwargs)
+    model_kwargs = dict(
+        **kwargs,
+    )
+
+    return build_model_with_cfg(
+        HMAX_bypass,
+        variant,
+        pretrained,
+        **model_kwargs,
+    )
+
 
 @register_model
 def hmax_full(pretrained=False, **kwargs) -> HMAX:
