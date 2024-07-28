@@ -144,7 +144,7 @@ def create_dataset(
             assert has_imagenet, 'Please update to a newer PyTorch and torchvision for ImageNet dataset.'
             if split in _EVAL_SYNONYM:
                 split = 'val'
-            ds = ImageNet(split=split, **torch_kwargs)
+            ds = ImageNet(split=split, root=torch_kwargs['root'])
         elif name == 'image_folder' or name == 'folder':
             # in case torchvision ImageFolder is preferred over timm ImageDataset for some reason
             if search_split and os.path.isdir(root):
