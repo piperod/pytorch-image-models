@@ -36,9 +36,21 @@ class AlexNet(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size = 3, stride = 2))
+        # 2304 for 160 x 160
+        # 4096 for 192 x 192
+        # 9216 for 227 x 227
+        # 12544 for 270 x 270
+        # 16384 for 321 x 321
+        # 25600 for 382 x 382
+        # 43264 for 454 x 454
+        
+        # for 248 x 248 / 9216
+        # for 294 x 294 / 16384
+        # for 350 x 350 / 20736
+        # for 417 x 417 / 30976
         self.fc = nn.Sequential(
             nn.Dropout(0.5),
-            nn.Linear(9216, 4096),
+            nn.Linear(43264, 4096),
             nn.ReLU())
         self.fc1 = nn.Sequential(
             nn.Dropout(0.5),
@@ -65,5 +77,6 @@ import torch.utils.model_zoo as model_zoo
 def alexnet(pretrained=False, **kwargs):
     model = AlexNet()
     if pretrained:
-        model.load_state_dict(model_zoo.load_url("/oscar/home/npant1/data/npant1/alexnet-owt-7be5be79.pth"))
+        pass
+        # model.load_state_dict(model_zoo.load_url("/oscar/home/npant1/data/npant1/alexnet-owt-7be5be79.pth"))
     return model

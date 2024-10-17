@@ -19,6 +19,7 @@ from contextlib import suppress
 from functools import partial
 
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 import torch.nn.parallel
 
@@ -86,6 +87,10 @@ parser.add_argument('--img-size', default=None, type=int,
                     metavar='N', help='Input image dimension, uses model default if empty')
 parser.add_argument('--in-chans', type=int, default=None, metavar='N',
                     help='Image input channels (default: None => 3)')
+
+parser.add_argument('--image-scale', default=None, nargs=3, type=int,
+                    metavar='N N N', help='Input image scale before padding (d h w, e.g. --input-size 3 224 224), uses model default if empty')
+
 parser.add_argument('--input-size', default=None, nargs=3, type=int,
                     metavar='N N N', help='Input all image dimensions (d h w, e.g. --input-size 3 224 224), uses model default if empty')
 parser.add_argument('--use-train-size', action='store_true', default=False,
@@ -160,6 +165,24 @@ parser.add_argument('--valid-labels', default='', type=str, metavar='FILENAME',
 parser.add_argument('--retry', default=False, action='store_true',
                     help='Enable batch size decay & retry for single model validation')
 
+def pad_batch(images, target_size):
+    _, _, h, w = images.shape
+    target_h, target_w = target_size
+
+    # Calculate padding
+    pad_h = max(target_h - h, 0)
+    pad_w = max(target_w - w, 0)
+
+    # Calculate padding for each side
+    pad_top = pad_h // 2
+    pad_bottom = pad_h - pad_top
+    pad_left = pad_w // 2
+    pad_right = pad_w - pad_left
+
+    # Apply padding
+    padded_images = F.pad(images, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
+
+    return padded_images
 
 def validate(args):
     # might as well try to validate something
@@ -265,7 +288,7 @@ def validate(args):
     else:
         input_img_mode = args.input_img_mode
     dataset = create_dataset(
-        root=root_dir,
+        root=args.data_dir,
         name=args.dataset,
         split=args.split,
         download=args.dataset_download,
@@ -291,7 +314,8 @@ def validate(args):
     crop_pct = 1.0 if test_time_pool else data_config['crop_pct']
     loader = create_loader(
         dataset,
-        input_size=data_config['input_size'],
+        # input_size=data_config['input_size'],
+        input_size=args.image_scale,
         batch_size=args.batch_size,
         use_prefetcher=args.prefetcher,
         interpolation=data_config['interpolation'],
@@ -305,6 +329,24 @@ def validate(args):
         device=device,
         tf_preprocessing=args.tf_preprocessing,
     )
+    
+    target_size = tuple(data_config['input_size'][1:])  # Assuming input_size is (C, H, W)
+
+    
+    # import numpy as np
+    # import matplotlib.pyplot as plt
+    
+    # images, _ = next(iter(loader))
+    # images = pad_batch(images, target_size)
+    
+    
+    # img = images[0]
+    # print(f"Image shape: {img.shape}")
+    # img_np = img.permute(1, 2, 0).cpu().numpy()
+    # img_np = np.clip(img_np, 0, 1)
+    # plt.imsave('sample_image.png', img_np)
+    # exit(0)
+
 
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -322,6 +364,8 @@ def validate(args):
 
         end = time.time()
         for batch_idx, (input, target) in enumerate(loader):
+            input = pad_batch(input, target_size) # padding!!!
+
             if args.no_prefetcher:
                 target = target.to(device)
                 input = input.to(device)
