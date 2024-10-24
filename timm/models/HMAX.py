@@ -399,58 +399,89 @@ class S3(nn.Module):
         # get dimensions
         return [self.layer(x) for x in x_pyramid]
 
+# class C(nn.Module):
+#     ## Scale then Spatial
+#     def __init__(self, pool_func = nn.MaxPool2d(kernel_size = 3, stride = 2)):
+#         super(C, self).__init__()
+#         ## TODO: Add arguments for kernel_sizes
+#         self.pool = pool_func
+#     def forward(self,x_pyramid):
+#         # if only one thing in pyramid, return
+
+#         if len(x_pyramid) == 1:
+#             return [self.pool(x_pyramid[0])]
+
+#         out = []
+
+#         for i in range(0, len(x_pyramid) - 1):
+#             x_1 = x_pyramid[i]
+#             x_2 = x_pyramid[i+1]
+#             # First interpolating such that feature points match spatially
+#             if x_1.shape[-1] > x_2.shape[-1]:
+#                 x_2 = F.interpolate(x_2, size = x_1.shape[-2:], mode = 'bilinear')
+#             else:
+#                 x_1 = F.interpolate(x_1, size = x_2.shape[-2:], mode = 'bilinear')
+
+#             x = torch.stack([x_1, x_2], dim=4)
+#             to_append, _ = torch.max(x, dim=4)
+            
+#             #spatial pooling
+#             to_append = self.pool(to_append)
+#             out.append(to_append)
+
+#         return out
+
+
 class C(nn.Module):
-    def __init__(self, pool_func = nn.MaxPool2d(kernel_size = 3, stride = 2)):
+    #Spatial then Scale
+    def __init__(self, pool_func1 = nn.MaxPool2d(kernel_size = 3, stride = 2), pool_func2 = nn.MaxPool2d(kernel_size = 4, stride = 3)):
         super(C, self).__init__()
         ## TODO: Add arguments for kernel_sizes
-        self.pool = pool_func
+        self.pool1 = pool_func1
+        self.pool2 = pool_func2
     def forward(self,x_pyramid):
         # if only one thing in pyramid, return
 
         if len(x_pyramid) == 1:
-            return [self.pool(x_pyramid[0])]
+            return [self.pool1(x_pyramid[0])]
 
         out = []
 
-        ## TODO: what does this mean?
-        ori_size = x_pyramid[-int(np.ceil(len(x_pyramid)/2))].shape[2:4]
-
-        ## TODO: what should we do if there are an odd number of scale bands?
-        for i in range(0, len(x_pyramid), 2):
+        for i in range(0, len(x_pyramid) - 1):
             x_1 = x_pyramid[i]
             x_2 = x_pyramid[i+1]
-            # First interpolating such that feature points match spatially
+
+            
+            #spatial pooling
+            x_1 = self.pool1(x_1)
+            x_2 = self.pool2(x_2)
+
+            # Then fix the sizing interpolating such that feature points match spatially
             if x_1.shape[-1] > x_2.shape[-1]:
                 x_2 = F.interpolate(x_2, size = x_1.shape[-2:], mode = 'bilinear')
             else:
                 x_1 = F.interpolate(x_1, size = x_2.shape[-2:], mode = 'bilinear')
 
-            # Then padding
-            x_1 = pad_to_size(x_1, ori_size)
-            x_2 = pad_to_size(x_2, ori_size)
-
             x = torch.stack([x_1, x_2], dim=4)
-
-            ## TODO: Verify that this is operating on the right dimension
             to_append, _ = torch.max(x, dim=4)
-            
-            #spatial pooling
-            to_append = self.pool(to_append)
+
             out.append(to_append)
 
         return out
 
 
 class HMAX_from_Alexnet(nn.Module):
-    def __init__(self, num_classes=1000, in_chans=3):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312):
         self.num_classes = num_classes
         self.in_chans = in_chans
+        #ip_scale_bands: the number of scale BANDS (one less than the number of images in the pyramid)
+        self.ip_scale_bands = ip_scale_bands
         super(HMAX_from_Alexnet, self).__init__()
 
         self.layer1 = S1()
         self.pool1 = C()
         self.S2b = S2b()
-        self.C2b = C(nn.MaxPool2d(kernel_size = 12, stride = 6))
+        self.C2b = C(nn.MaxPool2d(kernel_size = 10, stride = 5), nn.MaxPool2d(kernel_size = 12, stride = 6))
 
         self.layer2 = S2()
         self.pool2 = C()
@@ -458,7 +489,7 @@ class HMAX_from_Alexnet(nn.Module):
         self.pool3 =  C()
         self.fc = nn.Sequential(
             nn.Dropout(0.5),
-            nn.Linear(5120, 4096),
+            nn.Linear(classifier_input_size, 4096),
             nn.ReLU())
         self.fc1 = nn.Sequential(
             nn.Dropout(0.5),
@@ -468,23 +499,29 @@ class HMAX_from_Alexnet(nn.Module):
             nn.Linear(4096, num_classes))
 
 
-    def make_ip(self, x, num_ip_scales=5):
+    def make_ip(self, x):
+        ## num_scale_bands = num images in IP - 1
+        num_scale_bands = self.ip_scale_bands
         base_image_size = int(x.shape[-1])
-        scale = 4
+        scale = 4 ## factor in exponenet
         
-        if num_ip_scales == 1:
+        if num_scale_bands == 1:
             image_scales_down = [base_image_size]
             image_scales_up = []
-        elif num_ip_scales == 2:
+        elif num_scale_bands == 2:
             image_scales_up = [base_image_size, np.ceil(base_image_size*(2**(1/scale)))]
             image_scales_down = []
         else:
-            image_scales_down = [np.ceil(base_image_size/(2**(i/scale))) for i in range(int(np.ceil(num_ip_scales/2)))]
-            image_scales_up = [np.ceil(base_image_size*(2**(i/scale))) for i in range(1, int(np.ceil(num_ip_scales/2)) - 1)]
+            image_scales_down = [np.ceil(base_image_size/(2**(i/scale))) for i in range(int(np.ceil(num_scale_bands/2))+1)]
+            image_scales_up = [np.ceil(base_image_size*(2**(i/scale))) for i in range(1, int(np.ceil(num_scale_bands/2))+1)]
         
-        ## TODO: Investigate why this isn't working properly
         image_scales = image_scales_down + image_scales_up
         image_scales.sort(reverse=True)
+
+        # ## assert that image pyramid contains correct number of images
+        # print(len(image_scales))
+        # print(num_scale_bands + 1)
+        # assert(len(image_scales) == num_scale_bands + 1)
 
         if len(image_scales) > 1:
             image_pyramid = []
@@ -501,48 +538,19 @@ class HMAX_from_Alexnet(nn.Module):
 
         out = self.make_ip(x)
         ## should make SxBxCxHxW
-        # for x in out:
-        #     print(x.shape)
 
         out = self.layer1(out) #s1
-
-        # print("s1")
-        # for x in out:
-        #     print(x.shape)
         out = self.pool1(out) #c1
-
-        # print("c1")
-        # for x in out:
-        #     print(x.shape)
 
         #bypass layers
         bypass = self.S2b(out)
-        # print("s2b")
-        # for x in out:
-        #     print(x.shape)
-
         bypass = self.C2b(bypass)
-        # print("c2b")
-        # for x in bypass:
-        #     print(x.shape)
         
         # main
         out = self.layer2(out) #s2 
-        # print("s2")
-        # for x in out:
-        #     print(x.shape)
         out = self.pool2(out) # c2
-        # print("c2")
-        # for x in out:
-        #     print(x.shape)
         out = self.layer3(out)
-        # print("s3")
-        # for x in out:
-        #     print(x.shape)
         out = self.pool3(out) #c3?
-        # print("c3")
-        # for x in out:
-        #     print(x.shape)
 
         out = torch.cat(out)
         out = out.reshape(out.size(0), -1)
@@ -556,6 +564,7 @@ class HMAX_from_Alexnet(nn.Module):
         out = self.fc(out)
         out = self.fc1(out)
         out = self.fc2(out)
+        exit()
         return out
 #########################################################################################################
 
