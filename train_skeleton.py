@@ -1010,8 +1010,18 @@ def train_one_epoch(
 
         def _forward():
             # with amp_autocast():
-            output = model(input)
-            loss = loss_fn(output, target)
+            try:
+                if args.model_kwargs["contrastive_loss"]:
+                    print("running with contrastive loss")
+                    output = model(input)
+                    loss = loss_fn(output, target)
+
+            # default normal model behavior
+            except: 
+                print("Not using contrastive loss")
+            finally: 
+                output = model(input)
+                loss = loss_fn(output, target)
             # if accum_steps > 1:
             #     loss /= accum_steps
             return loss
