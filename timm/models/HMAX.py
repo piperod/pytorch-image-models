@@ -652,7 +652,7 @@ class HMAX_from_Alexnet_bypass(nn.Module):
         bypass = self.fc1(bypass)
         bypass = self.fc2(bypass)
         if self.contrastive_loss:
-            return bypass, c2b_feats
+            return bypass, torch.cat(c2b_feats)
         return bypass
 
 import random
@@ -700,7 +700,7 @@ class CHMAX(nn.Module):
         
         stream_2_output, stream_2_c2b_feats = self.model_backbone(x_rescaled)
 
-        correct_scale_loss = torch.mean(torch.abs(torch.stack(stream_1_c2b_feats) - torch.stack(stream_2_c2b_feats)))
+        correct_scale_loss = torch.mean(torch.abs(stream_1_c2b_feats - stream_2_c2b_feats))
         
         return stream_1_output, correct_scale_loss
 
