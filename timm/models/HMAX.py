@@ -244,94 +244,94 @@ class HMAX(nn.Module):
         return x    
 
 #########################################################################################################
-class HMAX_bypass(nn.Module):
-    def __init__(self,
-                #  args,
-                 in_chans=3,
-                 s1_channels_out=96,
-                 s1_scale=15,
-                 s1_stride=1,
-                 s2b_kernel_size=[4,8,12,16],
-                 s2b_channels_out=128,
-                 hidden_dim=1024,
-                 num_classes=1000,
-                 drop_rate=0.5,
-                 drop_path_rate=0.5,
-                 bypass_only=False,
-                 ):
+# class HMAX_bypass(nn.Module):
+#     def __init__(self,
+#                 #  args,
+#                  in_chans=3,
+#                  s1_channels_out=96,
+#                  s1_scale=15,
+#                  s1_stride=1,
+#                  s2b_kernel_size=[4,8,12,16],
+#                  s2b_channels_out=128,
+#                  hidden_dim=1024,
+#                  num_classes=1000,
+#                  drop_rate=0.5,
+#                  drop_path_rate=0.5,
+#                  bypass_only=False,
+#                  ):
         
-        self.in_chans=in_chans
-        self.s1_channels_out=s1_channels_out
-        self.s1_scale=s1_scale
-        self.s1_stride=s1_stride
-        self.s2b_kernel_size=s2b_kernel_size
-        self.s2b_channels_out= s2b_channels_out
-        self.num_classes=num_classes
-        self.drop_rate=drop_rate
-        self.drop_path_rate=drop_path_rate
-        self.hidden_dim=hidden_dim
+#         self.in_chans=in_chans
+#         self.s1_channels_out=s1_channels_out
+#         self.s1_scale=s1_scale
+#         self.s1_stride=s1_stride
+#         self.s2b_kernel_size=s2b_kernel_size
+#         self.s2b_channels_out= s2b_channels_out
+#         self.num_classes=num_classes
+#         self.drop_rate=drop_rate
+#         self.drop_path_rate=drop_path_rate
+#         self.hidden_dim=hidden_dim
 
-        super(HMAX_bypass, self).__init__()
-#########################################################################################################
+#         super(HMAX_bypass, self).__init__()
+# #########################################################################################################
 
-        self.conv1 = nn.Conv2d(in_chans, self.s1_channels_out, kernel_size=self.s1_scale, stride=self.s1_stride, padding='valid')
-        self.batchnorm1 = nn.Sequential(nn.BatchNorm2d(self.s1_channels_out, 1e-3),
-                                    nn.ReLU(True),
-                                    )
+#         self.conv1 = nn.Conv2d(in_chans, self.s1_channels_out, kernel_size=self.s1_scale, stride=self.s1_stride, padding='valid')
+#         self.batchnorm1 = nn.Sequential(nn.BatchNorm2d(self.s1_channels_out, 1e-3),
+#                                     nn.ReLU(True),
+#                                     )
 
-        self.s2b_seqs = nn.ModuleList()
-        for size in self.s2b_kernel_size:
-            self.s2b_seqs.append(nn.Sequential(
-                nn.Conv2d(self.s1_channels_out, self.s2b_channels_out, kernel_size=size, stride=1, padding=size//2),
-                nn.BatchNorm2d(self.s2b_channels_out, 1e-3),
-                nn.ReLU(True)
-            ))        
+#         self.s2b_seqs = nn.ModuleList()
+#         for size in self.s2b_kernel_size:
+#             self.s2b_seqs.append(nn.Sequential(
+#                 nn.Conv2d(self.s1_channels_out, self.s2b_channels_out, kernel_size=size, stride=1, padding=size//2),
+#                 nn.BatchNorm2d(self.s2b_channels_out, 1e-3),
+#                 nn.ReLU(True)
+#             ))        
 
-        self.classifier = nn.Sequential(
-                                        # nn.Dropout(0.5),
-                                        nn.Linear(self.get_s4_in_channels(), self.hidden_dim),  # fc1
-                                        # nn.Dropout(0.2),
-                                        nn.Linear(self.hidden_dim, 1024),  # fc2
-                                        nn.Linear(1024, self.num_classes)  # fc3
-                                        )
+#         self.classifier = nn.Sequential(
+#                                         # nn.Dropout(0.5),
+#                                         nn.Linear(self.get_s4_in_channels(), self.hidden_dim),  # fc1
+#                                         # nn.Dropout(0.2),
+#                                         nn.Linear(self.hidden_dim, 1024),  # fc2
+#                                         nn.Linear(1024, self.num_classes)  # fc3
+#                                         )
 
 
-    def get_s4_in_channels(self):
+#     def get_s4_in_channels(self):
         
-        s1_out_size = ((224 - self.s1_scale) // self.s1_stride) + 1
-        c1_out_size = ((s1_out_size - 14) // 1) + 1
-        s2b_out_size = (c1_out_size + 1) ## this is currently true because padding + stride 1
-        c2b_out_size = ((s2b_out_size - 12) // 6) + 1
+#         s1_out_size = ((224 - self.s1_scale) // self.s1_stride) + 1
+#         c1_out_size = ((s1_out_size - 14) // 1) + 1
+#         s2b_out_size = (c1_out_size + 1) ## this is currently true because padding + stride 1
+#         c2b_out_size = ((s2b_out_size - 12) // 6) + 1
 
-        c2b_out = len(self.s2b_kernel_size) * self.s2b_channels_out * c2b_out_size * c2b_out_size
-        s4_in = c2b_out
+#         c2b_out = len(self.s2b_kernel_size) * self.s2b_channels_out * c2b_out_size * c2b_out_size
+#         s4_in = c2b_out
 
-        return s4_in
+#         return s4_in
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.batchnorm1(x)
-        x = F.max_pool2d(x, kernel_size=14, stride=1)
+#     def forward(self, x):
+#         x = self.conv1(x)
+#         x = self.batchnorm1(x)
+#         x = F.max_pool2d(x, kernel_size=14, stride=1)
 
-        x = torch.cat([seq(x) for seq in self.s2b_seqs], dim=1)
-        x = F.max_pool2d(x, kernel_size=12, stride=6)
-        x = torch.flatten(x, start_dim=1)
-        x = self.classifier(x)
-        return x    
+#         x = torch.cat([seq(x) for seq in self.s2b_seqs], dim=1)
+#         x = F.max_pool2d(x, kernel_size=12, stride=6)
+#         x = torch.flatten(x, start_dim=1)
+#         x = self.classifier(x)
+#         return x    
 
-def pad_to_size(a, size):
-    current_size = (a.shape[-2], a.shape[-1])
-    total_pad_h = size[0] - current_size[0]
-    pad_top = total_pad_h // 2
-    pad_bottom = total_pad_h - pad_top
+# def pad_to_size(a, size):
+#     current_size = (a.shape[-2], a.shape[-1])
+#     total_pad_h = size[0] - current_size[0]
+#     pad_top = total_pad_h // 2
+#     pad_bottom = total_pad_h - pad_top
 
-    total_pad_w = size[1] - current_size[1]
-    pad_left = total_pad_w // 2
-    pad_right = total_pad_w - pad_left
+#     total_pad_w = size[1] - current_size[1]
+#     pad_left = total_pad_w // 2
+#     pad_right = total_pad_w - pad_left
 
-    a = nn.functional.pad(a, (pad_left, pad_right, pad_top, pad_bottom))
+#     a = nn.functional.pad(a, (pad_left, pad_right, pad_top, pad_bottom))
 
-    return a
+#     return a
 
 
 
@@ -400,58 +400,91 @@ class S3(nn.Module):
         # get dimensions
         return [self.layer(x) for x in x_pyramid]
 
+# class C(nn.Module):
+#     ## Scale then Spatial
+#     def __init__(self, pool_func = nn.MaxPool2d(kernel_size = 3, stride = 2)):
+#         super(C, self).__init__()
+#         ## TODO: Add arguments for kernel_sizes
+#         self.pool = pool_func
+#     def forward(self,x_pyramid):
+#         # if only one thing in pyramid, return
+
+#         if len(x_pyramid) == 1:
+#             return [self.pool(x_pyramid[0])]
+
+#         out = []
+
+#         for i in range(0, len(x_pyramid) - 1):
+#             x_1 = x_pyramid[i]
+#             x_2 = x_pyramid[i+1]
+#             # First interpolating such that feature points match spatially
+#             if x_1.shape[-1] > x_2.shape[-1]:
+#                 x_2 = F.interpolate(x_2, size = x_1.shape[-2:], mode = 'bilinear')
+#             else:
+#                 x_1 = F.interpolate(x_1, size = x_2.shape[-2:], mode = 'bilinear')
+
+#             x = torch.stack([x_1, x_2], dim=4)
+#             to_append, _ = torch.max(x, dim=4)
+            
+#             #spatial pooling
+#             to_append = self.pool(to_append)
+#             out.append(to_append)
+
+#         return out
+
+
 class C(nn.Module):
-    def __init__(self, pool_func = nn.MaxPool2d(kernel_size = 3, stride = 2)):
+    #Spatial then Scale
+    def __init__(self, pool_func1 = nn.MaxPool2d(kernel_size = 3, stride = 2), pool_func2 = nn.MaxPool2d(kernel_size = 4, stride = 3)):
         super(C, self).__init__()
         ## TODO: Add arguments for kernel_sizes
-        self.pool = pool_func
+        self.pool1 = pool_func1
+        self.pool2 = pool_func2
     def forward(self,x_pyramid):
         # if only one thing in pyramid, return
 
         if len(x_pyramid) == 1:
-            return [self.pool(x_pyramid[0])]
+            return [self.pool1(x_pyramid[0])]
 
         out = []
 
-        ## TODO: what does this mean?
-        ori_size = x_pyramid[-int(np.ceil(len(x_pyramid)/2))].shape[2:4]
-
-        ## TODO: what should we do if there are an odd number of scale bands?
-        for i in range(0, len(x_pyramid), 2):
+        for i in range(0, len(x_pyramid) - 1):
             x_1 = x_pyramid[i]
             x_2 = x_pyramid[i+1]
-            # First interpolating such that feature points match spatially
+
+            
+            #spatial pooling
+            x_1 = self.pool1(x_1)
+            x_2 = self.pool2(x_2)
+
+            # Then fix the sizing interpolating such that feature points match spatially
             if x_1.shape[-1] > x_2.shape[-1]:
                 x_2 = F.interpolate(x_2, size = x_1.shape[-2:], mode = 'bilinear')
             else:
                 x_1 = F.interpolate(x_1, size = x_2.shape[-2:], mode = 'bilinear')
 
-            # Then padding
-            x_1 = pad_to_size(x_1, ori_size)
-            x_2 = pad_to_size(x_2, ori_size)
-
             x = torch.stack([x_1, x_2], dim=4)
-
-            ## TODO: Verify that this is operating on the right dimension
             to_append, _ = torch.max(x, dim=4)
-            
-            #spatial pooling
-            to_append = self.pool(to_append)
+
             out.append(to_append)
 
         return out
 
 
 class HMAX_from_Alexnet(nn.Module):
-    def __init__(self, num_classes=1000, in_chans=3):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, contrastive_loss=False):
         self.num_classes = num_classes
         self.in_chans = in_chans
+        #ip_scale_bands: the number of scale BANDS (one less than the number of images in the pyramid)
+        self.ip_scale_bands = ip_scale_bands
+        # contrastive_loss: boolean for if the model should be using contrastive loss or not
+        self.contrastive_loss = contrastive_loss
         super(HMAX_from_Alexnet, self).__init__()
 
         self.layer1 = S1()
         self.pool1 = C()
         self.S2b = S2b()
-        self.C2b = C(nn.MaxPool2d(kernel_size = 12, stride = 6))
+        self.C2b = C(nn.MaxPool2d(kernel_size = 10, stride = 5), nn.MaxPool2d(kernel_size = 12, stride = 6))
 
         self.layer2 = S2()
         self.pool2 = C()
@@ -459,7 +492,7 @@ class HMAX_from_Alexnet(nn.Module):
         self.pool3 =  C()
         self.fc = nn.Sequential(
             nn.Dropout(0.5),
-            nn.Linear(5120, 4096),
+            nn.Linear(classifier_input_size, 4096),
             nn.ReLU())
         self.fc1 = nn.Sequential(
             nn.Dropout(0.5),
@@ -469,23 +502,29 @@ class HMAX_from_Alexnet(nn.Module):
             nn.Linear(4096, num_classes))
 
 
-    def make_ip(self, x, num_ip_scales=5):
+    def make_ip(self, x):
+        ## num_scale_bands = num images in IP - 1
+        num_scale_bands = self.ip_scale_bands
         base_image_size = int(x.shape[-1])
-        scale = 4
+        scale = 4 ## factor in exponenet
         
-        if num_ip_scales == 1:
+        if num_scale_bands == 1:
             image_scales_down = [base_image_size]
             image_scales_up = []
-        elif num_ip_scales == 2:
+        elif num_scale_bands == 2:
             image_scales_up = [base_image_size, np.ceil(base_image_size*(2**(1/scale)))]
             image_scales_down = []
         else:
-            image_scales_down = [np.ceil(base_image_size/(2**(i/scale))) for i in range(int(np.ceil(num_ip_scales/2)))]
-            image_scales_up = [np.ceil(base_image_size*(2**(i/scale))) for i in range(1, int(np.ceil(num_ip_scales/2)) - 1)]
+            image_scales_down = [np.ceil(base_image_size/(2**(i/scale))) for i in range(int(np.ceil(num_scale_bands/2))+1)]
+            image_scales_up = [np.ceil(base_image_size*(2**(i/scale))) for i in range(1, int(np.ceil(num_scale_bands/2))+1)]
         
-        ## TODO: Investigate why this isn't working properly
         image_scales = image_scales_down + image_scales_up
         image_scales.sort(reverse=True)
+
+        # ## assert that image pyramid contains correct number of images
+        # print(len(image_scales))
+        # print(num_scale_bands + 1)
+        # assert(len(image_scales) == num_scale_bands + 1)
 
         if len(image_scales) > 1:
             image_pyramid = []
@@ -502,48 +541,19 @@ class HMAX_from_Alexnet(nn.Module):
 
         out = self.make_ip(x)
         ## should make SxBxCxHxW
-        # for x in out:
-        #     print(x.shape)
 
         out = self.layer1(out) #s1
-
-        # print("s1")
-        # for x in out:
-        #     print(x.shape)
         out = self.pool1(out) #c1
-
-        # print("c1")
-        # for x in out:
-        #     print(x.shape)
 
         #bypass layers
         bypass = self.S2b(out)
-        # print("s2b")
-        # for x in out:
-        #     print(x.shape)
-
         bypass = self.C2b(bypass)
-        # print("c2b")
-        # for x in bypass:
-        #     print(x.shape)
         
         # main
         out = self.layer2(out) #s2 
-        # print("s2")
-        # for x in out:
-        #     print(x.shape)
         out = self.pool2(out) # c2
-        # print("c2")
-        # for x in out:
-        #     print(x.shape)
         out = self.layer3(out)
-        # print("s3")
-        # for x in out:
-        #     print(x.shape)
         out = self.pool3(out) #c3?
-        # print("c3")
-        # for x in out:
-        #     print(x.shape)
 
         out = torch.cat(out)
         out = out.reshape(out.size(0), -1)
@@ -552,13 +562,149 @@ class HMAX_from_Alexnet(nn.Module):
 
         ## merge here
         out = torch.cat([bypass, out], dim=1)
+        if self.contrastive_loss:
+            # cl means contrastive loss
+            cl_feats = out
         del bypass
 
         out = self.fc(out)
         out = self.fc1(out)
         out = self.fc2(out)
+        if self.contrastive_loss:
+            return out, cl_feats
         return out
 #########################################################################################################
+
+class HMAX_from_Alexnet_bypass(nn.Module):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=4096, contrastive_loss=False):
+        self.num_classes = num_classes
+        self.in_chans = in_chans
+        #ip_scale_bands: the number of scale BANDS (one less than the number of images in the pyramid)
+        self.ip_scale_bands = ip_scale_bands
+        # contrastive_loss: boolean for if the model should be using contrastive loss or not
+        self.classifier_input_size = classifier_input_size
+        self.contrastive_loss = contrastive_loss
+        super(HMAX_from_Alexnet_bypass, self).__init__()
+
+        self.layer1 = S1()
+        self.pool1 = C()
+        self.S2b = S2b()
+        self.C2b = C(nn.MaxPool2d(kernel_size = 10, stride = 5), nn.MaxPool2d(kernel_size = 12, stride = 6))
+
+        self.fc = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(self.classifier_input_size, 4096),
+            nn.ReLU())
+        self.fc1 = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(4096, 4096),
+            nn.ReLU())
+        self.fc2= nn.Sequential(
+            nn.Linear(4096, num_classes))
+
+
+    def make_ip(self, x):
+        ## num_scale_bands = num images in IP - 1
+        num_scale_bands = self.ip_scale_bands
+        base_image_size = int(x.shape[-1])
+        scale = 4 ## factor in exponenet
+        
+        if num_scale_bands == 1:
+            image_scales_down = [base_image_size]
+            image_scales_up = []
+        elif num_scale_bands == 2:
+            image_scales_up = [base_image_size, np.ceil(base_image_size*(2**(1/scale)))]
+            image_scales_down = []
+        else:
+            image_scales_down = [np.ceil(base_image_size/(2**(i/scale))) for i in range(int(np.ceil(num_scale_bands/2))+1)]
+            image_scales_up = [np.ceil(base_image_size*(2**(i/scale))) for i in range(1, int(np.ceil(num_scale_bands/2))+1)]
+        
+        image_scales = image_scales_down + image_scales_up
+        image_scales.sort(reverse=True)
+
+        if len(image_scales) > 1:
+            image_pyramid = []
+            for i_s in image_scales:
+                i_s = int(i_s)
+                interpolated_img = F.interpolate(x, size = (i_s, i_s), mode = 'bilinear').clamp(min=0, max=1)
+                
+                image_pyramid.append(interpolated_img)
+            return image_pyramid
+        else:
+            return [x]
+    
+    def forward(self, x):
+
+        bypass = self.make_ip(x)
+        ## should make SxBxCxHxW
+
+        bypass = self.layer1(bypass) #s1
+        bypass = self.pool1(bypass) #c1
+
+        #bypass layers
+        bypass = self.S2b(bypass)
+        bypass = self.C2b(bypass)
+        if self.contrastive_loss: 
+            c2b_feats = bypass
+        bypass = torch.cat(bypass)
+        bypass = bypass.reshape(bypass.size(0), -1)
+
+        bypass = self.fc(bypass)
+        bypass = self.fc1(bypass)
+        bypass = self.fc2(bypass)
+        if self.contrastive_loss:
+            return bypass, c2b_feats
+        return bypass
+
+import random
+import torchvision
+
+class CHMAX(nn.Module):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, hmax_type="full"):
+        super(CHMAX, self).__init__()
+        if hmax_type == "full":
+            self.model_backbone = HMAX_from_Alexnet(num_classes=num_classes,
+                                                        in_chans=in_chans,
+                                                        ip_scale_bands=ip_scale_bands,
+                                                        classifier_input_size=classifier_input_size,
+                                                        contrastive_loss=True)
+        elif hmax_type == "bypass":
+            self.model_backbone = HMAX_from_Alexnet_bypass(num_classes=num_classes,
+                                                        in_chans=in_chans,
+                                                        ip_scale_bands=ip_scale_bands,
+                                                        classifier_input_size=classifier_input_size,
+                                                        contrastive_loss=True)
+        else:
+            raise(NotImplementedError)
+
+        self.num_classes = num_classes
+        self.in_chans = in_chans
+        #ip_scale_bands: the number of scale BANDS (one less than the number of images in the pyramid)
+        self.ip_scale_bands = ip_scale_bands
+
+    def forward(self, x):
+
+        # stream 1
+        stream_1_output, stream_1_c2b_feats = self.model_backbone(x)
+
+        # stream 2
+        scale_factor_list = [0.707, 0.841, 1, 1.189, 1.414]
+        scale_factor = random.choice(scale_factor_list)
+        img_hw = x.shape[-1]
+        new_hw = int(img_hw*scale_factor)
+        x_rescaled = F.interpolate(x, size = (new_hw, new_hw), mode = 'bilinear').clamp(min=0, max=1)
+        if new_hw <= img_hw:
+            x_rescaled = pad_to_size(x_rescaled, (img_hw, img_hw))
+        elif new_hw > img_hw:
+            center_crop = torchvision.transforms.CenterCrop(img_hw)
+            x_rescaled = center_crop(x_rescaled)
+        
+        stream_2_output, stream_2_c2b_feats = self.model_backbone(x_rescaled)
+
+        correct_scale_loss = torch.mean(torch.abs(torch.stack(stream_1_c2b_feats) - torch.stack(stream_2_c2b_feats)))
+        
+        return stream_1_output, correct_scale_loss
+
 
 def checkpoint_filter_fn(state_dict, model: nn.Module):
     out_dict = {}
@@ -609,7 +755,40 @@ def hmax_bypass(pretrained=False, **kwargs) -> HMAX:
 
 @register_model
 def hmax_from_alexnet(pretrained=False, **kwargs):
-    model = HMAX_from_Alexnet()
+    ## there are some weird things in the kwargs by default that I don't care about
+    try:
+        del kwargs["pretrained_cfg"]
+        del kwargs["pretrained_cfg_overlay"]
+        del kwargs["drop_rate"]
+    except:
+        pass
+    model = HMAX_from_Alexnet(**kwargs)
+    if pretrained:
+        raise NotImplementedError
+    return model
+
+@register_model
+def hmax_from_alexnet_bypass(pretrained=False, **kwargs):
+    try:
+        del kwargs["pretrained_cfg"]
+        del kwargs["pretrained_cfg_overlay"]
+        del kwargs["drop_rate"]
+    except:
+        pass
+    model = HMAX_from_Alexnet_bypass(**kwargs)
+    if pretrained:
+        raise NotImplementedError
+    return model
+
+@register_model
+def chmax(pretrained=False, **kwargs):
+    try:
+        del kwargs["pretrained_cfg"]
+        del kwargs["pretrained_cfg_overlay"]
+        del kwargs["drop_rate"]
+    except:
+        pass
+    model = CHMAX(**kwargs)
     if pretrained:
         pass
         # raise NotImplementedError
