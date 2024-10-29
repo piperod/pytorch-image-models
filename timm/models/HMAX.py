@@ -15,6 +15,7 @@ from ._manipulate import checkpoint_seq
 from ._registry import register_model, generate_default_cfgs
 
 
+__all__ = ["HMAX", "HMAX_bypass", "HMAX_from_Alexnet", "hmax_from_alexnet", "hmax_full", "hmax_bypass"]
 
 def get_gabor(l_size, la, si, n_ori, aspect_ratio):
     """generate the gabor filters
@@ -610,5 +611,6 @@ def hmax_bypass(pretrained=False, **kwargs) -> HMAX:
 def hmax_from_alexnet(pretrained=False, **kwargs):
     model = HMAX_from_Alexnet()
     if pretrained:
-        raise NotImplementedError
+        pass
+        # raise NotImplementedError
     return model

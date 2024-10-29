@@ -9,7 +9,7 @@ from .registry import register_model
 __all__ = ["AlexNet", "alexnet"]
 
 class AlexNet(nn.Module):
-    def __init__(self, num_classes=1000, in_chans=3):
+    def __init__(self, num_classes=1000, in_chans=3, **kwargs):
         self.num_classes = num_classes
         self.in_chans = in_chans
         super(AlexNet, self).__init__()
@@ -43,14 +43,19 @@ class AlexNet(nn.Module):
         # 16384 for 321 x 321
         # 25600 for 382 x 382
         # 43264 for 454 x 454
-        
-        # for 248 x 248 / 9216
-        # for 294 x 294 / 16384
-        # for 350 x 350 / 20736
-        # for 417 x 417 / 30976
+
+        # create a dict
+        in_size_dict = {160: 2304,
+                        192: 4096,
+                        227: 9216,
+                        270: 12544,
+                        321: 16384,
+                        382: 25600,
+                        454: 43264}
+
         self.fc = nn.Sequential(
             nn.Dropout(0.5),
-            nn.Linear(43264, 4096),
+            nn.Linear(in_size_dict[kwargs['image_size']], 4096),
             nn.ReLU())
         self.fc1 = nn.Sequential(
             nn.Dropout(0.5),
@@ -75,7 +80,7 @@ import torch.utils.model_zoo as model_zoo
 
 @register_model
 def alexnet(pretrained=False, **kwargs):
-    model = AlexNet()
+    model = AlexNet(**kwargs)
     if pretrained:
         pass
         # model.load_state_dict(model_zoo.load_url("/oscar/home/npant1/data/npant1/alexnet-owt-7be5be79.pth"))

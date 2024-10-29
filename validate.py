@@ -89,7 +89,7 @@ parser.add_argument('--in-chans', type=int, default=None, metavar='N',
                     help='Image input channels (default: None => 3)')
 
 parser.add_argument('--image-scale', default=None, nargs=3, type=int,
-                    metavar='N N N', help='Input image scale before padding (d h w, e.g. --input-size 3 224 224), uses model default if empty')
+                    metavar='N N N', help='Input image scale before padding (d h w, e.g. --image-scale 3 224 224), uses model default if empty')
 
 parser.add_argument('--input-size', default=None, nargs=3, type=int,
                     metavar='N N N', help='Input all image dimensions (d h w, e.g. --input-size 3 224 224), uses model default if empty')
