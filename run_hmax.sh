@@ -19,8 +19,9 @@ source activate /users/npant1/anaconda3/envs/hmax
 sh distributed_train.sh 2 train_skeleton.py \
     --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
     --dataset torch/imagenet \
-    --model hmax_from_alexnet \
-    --model-kwargs ip_scale_bands=1 classifier_input_size=13312 \
+    --model chmax \
+    --model-kwargs ip_scale_bands=1 classifier_input_size=4096 hmax_type='full'\
+    --contrastive-loss \
     --opt sgd \
     -b 128 \
     --epochs 90 \

@@ -161,6 +161,8 @@ group.add_argument('--head-init-scale', default=None, type=float,
                    help='Head initialization scale')
 group.add_argument('--head-init-bias', default=None, type=float,
                    help='Head initialization bias value')
+group.add_argument('--contrastive-loss', default=False,  action='store_true',
+                   help='Is this model being trained with contrastive loss')
 
 # scripting / codegen
 # scripting_group = group.add_mutually_exclusive_group()
@@ -1010,16 +1012,13 @@ def train_one_epoch(
 
         def _forward():
             # with amp_autocast():
-            try:
-                if args.model_kwargs["contrastive_loss"]:
-                    print("running with contrastive loss")
-                    output = model(input)
-                    loss = loss_fn(output, target)
-
+            if args.contrastive_loss:
+                print("running with contrastive loss")
+                output, scale_loss = model(input)
+                loss = loss_fn(output, target) + scale_loss
             # default normal model behavior
-            except: 
+            else: 
                 print("Not using contrastive loss")
-            finally: 
                 output = model(input)
                 loss = loss_fn(output, target)
             # if accum_steps > 1:

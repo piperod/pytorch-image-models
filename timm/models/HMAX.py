@@ -471,8 +471,7 @@ class C(nn.Module):
 
 
 class HMAX_from_Alexnet(nn.Module):
-    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312,
-                 contrastive_loss=False):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, contrastive_loss=False):
         self.num_classes = num_classes
         self.in_chans = in_chans
         #ip_scale_bands: the number of scale BANDS (one less than the number of images in the pyramid)
@@ -562,25 +561,29 @@ class HMAX_from_Alexnet(nn.Module):
 
         ## merge here
         out = torch.cat([bypass, out], dim=1)
+        if self.contrastive_loss:
+            # cl means contrastive loss
+            cl_feats = out
         del bypass
 
         out = self.fc(out)
         out = self.fc1(out)
         out = self.fc2(out)
+        if self.contrastive_loss:
+            return out, cl_feats
         return out
 #########################################################################################################
 
-class HMAX_from_alexnet_bypass(nn.Module):
-    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=4096,
-                 contrastive_loss=False):
+class HMAX_from_Alexnet_bypass(nn.Module):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=4096, contrastive_loss=False):
         self.num_classes = num_classes
         self.in_chans = in_chans
         #ip_scale_bands: the number of scale BANDS (one less than the number of images in the pyramid)
         self.ip_scale_bands = ip_scale_bands
         # contrastive_loss: boolean for if the model should be using contrastive loss or not
-        self.contrastive_loss = contrastive_loss
         self.classifier_input_size = classifier_input_size
-        super(HMAX_from_alexnet_bypass, self).__init__()
+        self.contrastive_loss = contrastive_loss
+        super(HMAX_from_Alexnet_bypass, self).__init__()
 
         self.layer1 = S1()
         self.pool1 = C()
@@ -640,13 +643,67 @@ class HMAX_from_alexnet_bypass(nn.Module):
         #bypass layers
         bypass = self.S2b(bypass)
         bypass = self.C2b(bypass)
+        if self.contrastive_loss: 
+            c2b_feats = bypass
         bypass = torch.cat(bypass)
         bypass = bypass.reshape(bypass.size(0), -1)
 
         bypass = self.fc(bypass)
         bypass = self.fc1(bypass)
         bypass = self.fc2(bypass)
+        if self.contrastive_loss:
+            return bypass, c2b_feats
         return bypass
+
+import random
+import torchvision
+
+class CHMAX(nn.Module):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, hmax_type="full"):
+        super(CHMAX, self).__init__()
+        if hmax_type == "full":
+            self.model_backbone = HMAX_from_Alexnet(num_classes=num_classes,
+                                                        in_chans=in_chans,
+                                                        ip_scale_bands=ip_scale_bands,
+                                                        classifier_input_size=classifier_input_size,
+                                                        contrastive_loss=True)
+        elif hmax_type == "bypass":
+            self.model_backbone = HMAX_from_Alexnet_bypass(num_classes=num_classes,
+                                                        in_chans=in_chans,
+                                                        ip_scale_bands=ip_scale_bands,
+                                                        classifier_input_size=classifier_input_size,
+                                                        contrastive_loss=True)
+        else:
+            raise(NotImplementedError)
+
+        self.num_classes = num_classes
+        self.in_chans = in_chans
+        #ip_scale_bands: the number of scale BANDS (one less than the number of images in the pyramid)
+        self.ip_scale_bands = ip_scale_bands
+
+    def forward(self, x):
+
+        # stream 1
+        stream_1_output, stream_1_c2b_feats = self.model_backbone(x)
+
+        # stream 2
+        scale_factor_list = [0.707, 0.841, 1, 1.189, 1.414]
+        scale_factor = random.choice(scale_factor_list)
+        img_hw = x.shape[-1]
+        new_hw = int(img_hw*scale_factor)
+        x_rescaled = F.interpolate(x, size = (new_hw, new_hw), mode = 'bilinear').clamp(min=0, max=1)
+        if new_hw <= img_hw:
+            x_rescaled = pad_to_size(x_rescaled, (img_hw, img_hw))
+        elif new_hw > img_hw:
+            center_crop = torchvision.transforms.CenterCrop(img_hw)
+            x_rescaled = center_crop(x_rescaled)
+        
+        stream_2_output, stream_2_c2b_feats = self.model_backbone(x_rescaled)
+
+        correct_scale_loss = torch.mean(torch.abs(torch.stack(stream_1_c2b_feats) - torch.stack(stream_2_c2b_feats)))
+        
+        return stream_1_output, correct_scale_loss
+
 
 def checkpoint_filter_fn(state_dict, model: nn.Module):
     out_dict = {}
@@ -717,7 +774,20 @@ def hmax_from_alexnet_bypass(pretrained=False, **kwargs):
         del kwargs["drop_rate"]
     except:
         pass
-    model = HMAX_from_alexnet_bypass(**kwargs)
+    model = HMAX_from_Alexnet_bypass(**kwargs)
+    if pretrained:
+        raise NotImplementedError
+    return model
+
+@register_model
+def chmax(pretrained=False, **kwargs):
+    try:
+        del kwargs["pretrained_cfg"]
+        del kwargs["pretrained_cfg_overlay"]
+        del kwargs["drop_rate"]
+    except:
+        pass
+    model = CHMAX(**kwargs)
     if pretrained:
         raise NotImplementedError
     return model
