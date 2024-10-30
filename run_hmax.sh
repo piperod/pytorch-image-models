@@ -20,8 +20,8 @@ sh distributed_train.sh 2 train_skeleton.py \
     --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
     --dataset torch/imagenet \
     --model chmax \
-    --model-kwargs ip_scale_bands=1 classifier_input_size=4096 hmax_type='full'\
-    --contrastive-loss \
+    --model-kwargs ip_scale_bands=1 classifier_input_size=4096 hmax_type='bypass'\
+    --cl-lambda 0.2\
     --opt sgd \
     -b 128 \
     --epochs 90 \

@@ -661,6 +661,9 @@ import torchvision
 class CHMAX(nn.Module):
     def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, hmax_type="full"):
         super(CHMAX, self).__init__()
+
+        # the below line is so that the training script calculates the loss correctly
+        self.contrastive_loss = True
         if hmax_type == "full":
             self.model_backbone = HMAX_from_Alexnet(num_classes=num_classes,
                                                         in_chans=in_chans,
