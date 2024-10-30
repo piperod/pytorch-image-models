@@ -653,7 +653,7 @@ class HMAX_from_Alexnet_bypass(nn.Module):
         bypass = self.fc1(bypass)
         bypass = self.fc2(bypass)
         if self.contrastive_loss:
-            return bypass, c2b_feats
+            return bypass, torch.cat(c2b_feats)
         return bypass
 
 import random
@@ -662,6 +662,9 @@ import torchvision
 class CHMAX(nn.Module):
     def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, hmax_type="full"):
         super(CHMAX, self).__init__()
+
+        # the below line is so that the training script calculates the loss correctly
+        self.contrastive_loss = True
         if hmax_type == "full":
             self.model_backbone = HMAX_from_Alexnet(num_classes=num_classes,
                                                         in_chans=in_chans,
@@ -701,7 +704,7 @@ class CHMAX(nn.Module):
         
         stream_2_output, stream_2_c2b_feats = self.model_backbone(x_rescaled)
 
-        correct_scale_loss = torch.mean(torch.abs(torch.stack(stream_1_c2b_feats) - torch.stack(stream_2_c2b_feats)))
+        correct_scale_loss = torch.mean(torch.abs(stream_1_c2b_feats - stream_2_c2b_feats))
         
         return stream_1_output, correct_scale_loss
 
