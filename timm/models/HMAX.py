@@ -260,23 +260,27 @@ class C(nn.Module):
     def forward(self,x_pyramid):
         # if only one thing in pyramid, return
 
-        if len(x_pyramid) == 1:
-            return [self.pool1(x_pyramid[0])]
 
         out = []
         if self.global_scale_pool:
+            if len(x_pyramid) == 1:
+                return self.pool1(x_pyramid[0])
 
+            out = [self.pool1(x) for x in x_pyramid]
             # resize everything to be the same size
-            final_size = x_pyramid[len(x_pyramid) // 2].shape[-2:]
-            print([x.shape for x in x_pyramid])
-            print(f"resizing to : {final_size}")
-            out = F.interpolate(x_pyramid[0], final_size, mode='bilinear')
+            final_size = out[len(out) // 2].shape[-2:]
+            out = F.interpolate(out[0], final_size, mode='bilinear')
 
             for x in x_pyramid[1:]:
                 temp = F.interpolate(x, final_size, mode='bilinear')
                 out = torch.max(out, temp)  # Out-of-place operation to avoid in-place modification
                 del temp  # Free memory immediately
+
         else: # not global pool
+
+            if len(x_pyramid) == 1:
+                return [self.pool1(x_pyramid[0])]
+            
             for i in range(0, len(x_pyramid) - 1):
                 x_1 = x_pyramid[i]
                 x_2 = x_pyramid[i+1]
@@ -296,7 +300,6 @@ class C(nn.Module):
                 to_append, _ = torch.max(x, dim=4)
 
                 out.append(to_append)
-        print("out length", len(out))
         return out
 
 
@@ -361,14 +364,12 @@ class HMAX_from_Alexnet(nn.Module):
         #bypass layers
         bypass = self.S2b(out)
         bypass = self.C2b(bypass)
-        print("finished bypass")
         
         # main
         out = self.layer2(out) #s2 
         out = self.pool2(out) # c2
         out = self.layer3(out)
         out = self.pool3(out) #c3?
-        print("finish main")
         out = out.reshape(out.size(0), -1)
         bypass = bypass.reshape(bypass.size(0), -1)
 
@@ -490,7 +491,6 @@ class CHMAX(nn.Module):
 
         # stream 1
         stream_1_output, stream_1_c2b_feats = self.model_backbone(x)
-        print("finished stream 1")
 
         # stream 2
         scale_factor_list = [0.707, 0.841, 1, 1.189, 1.414]
@@ -504,12 +504,9 @@ class CHMAX(nn.Module):
             center_crop = torchvision.transforms.CenterCrop(img_hw)
             x_rescaled = center_crop(x_rescaled)
         
-        print(x_rescaled.shape)
         stream_2_output, stream_2_c2b_feats = self.model_backbone(x_rescaled)
-        print("finished stream 2")
 
         correct_scale_loss = torch.mean(torch.abs(stream_1_c2b_feats - stream_2_c2b_feats))
-        print("finishing chmax forward pass")
         return stream_1_output, correct_scale_loss
 
 

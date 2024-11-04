@@ -19,6 +19,7 @@ import importlib
 import json
 import logging
 import os
+import sys
 import time
 from collections import OrderedDict
 from contextlib import suppress
@@ -851,8 +852,9 @@ def main():
     if utils.is_primary(args):
         _logger.info(
             f'Scheduled epochs: {num_epochs}. LR stepped per {"epoch" if lr_scheduler.t_in_epochs else "update"}.')
-
+    
     results = []
+    original_stdout = sys.stdout
     try:
         for epoch in range(start_epoch, num_epochs):
             if hasattr(dataset_train, 'set_epoch'):
@@ -1014,16 +1016,13 @@ def train_one_epoch(
             # with amp_autocast():
             try:
                 if model.module.contrastive_loss:
-                    print("running with contrastive loss")
                     output, scale_loss = model(input)
                     loss = loss_fn(output, target) + (args.cl_lambda*scale_loss)
             # default normal model behavior
                 else: 
-                    print("Not using contrastive loss")
                     output = model(input)
                     loss = loss_fn(output, target)
             except:
-                    print("Not using a model that has contrastive loss enableable")
                     output = model(input)
                     loss = loss_fn(output, target)
 
@@ -1065,7 +1064,6 @@ def train_one_epoch(
         running_loss += loss.item()
         if batch_idx % 50 == 49:
             last_loss = running_loss / 50 # loss per batch
-            print('  batch {} loss: {}'.format(batch_idx + 1, last_loss))
             running_loss = 0.
 
         if not args.distributed:
