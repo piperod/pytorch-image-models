@@ -162,7 +162,7 @@ group.add_argument('--head-init-scale', default=None, type=float,
                    help='Head initialization scale')
 group.add_argument('--head-init-bias', default=None, type=float,
                    help='Head initialization bias value')
-group.add_argument('--cl-lambda', default=1,  type=float,
+group.add_argument('--cl-lambda', default=0,  type=float,
                    help='lambda to scale cl term')
 
 # scripting / codegen
