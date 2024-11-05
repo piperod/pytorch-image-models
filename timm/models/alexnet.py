@@ -55,7 +55,7 @@ class AlexNet(nn.Module):
 
         self.fc = nn.Sequential(
             nn.Dropout(0.5),
-            nn.Linear(in_size_dict[kwargs['image_size']], 4096),
+            nn.Linear(in_size_dict[kwargs['channel_size']], 4096),
             nn.ReLU())
         self.fc1 = nn.Sequential(
             nn.Dropout(0.5),

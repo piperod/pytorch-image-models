@@ -227,6 +227,8 @@ def validate(args):
     elif args.input_size is not None:
         in_chans = args.input_size[0]
 
+    args.model_kwargs['channel_size'] = args.input_size[-1]
+
     model = create_model(
         args.model,
         pretrained=args.pretrained,
@@ -315,7 +317,7 @@ def validate(args):
     loader = create_loader(
         dataset,
         # input_size=data_config['input_size'],
-        input_size=args.image_scale,
+        input_size=args.image_scale, ##############make image smaller
         batch_size=args.batch_size,
         use_prefetcher=args.prefetcher,
         interpolation=data_config['interpolation'],
@@ -364,6 +366,7 @@ def validate(args):
 
         end = time.time()
         for batch_idx, (input, target) in enumerate(loader):
+            #####PADDING FOR VALIDATION################
             input = pad_batch(input, target_size) # padding!!!
 
             if args.no_prefetcher:
@@ -375,6 +378,9 @@ def validate(args):
             # compute output
             with amp_autocast():
                 output = model(input)
+
+                if isinstance(output, (tuple, list)):
+                    output = output[0]
 
                 if valid_labels is not None:
                     output = output[:, valid_labels]

@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --time=1:00:00
+#SBATCH --time=3:00:00
 #SBATCH -p gpu --gres=gpu:2
-#SBATCH -n 2
+#SBATCH -n 4
 #SBATCH -N 1
 #SBATCH --mem=60GB
-#SBATCH -J scale_454_alex_size_454
-#SBATCH -o /users/xyu110/pytorch-image-models/scale_image_alexnet/scale_454_alex_size_454.out
-#SBATCH -e /users/xyu110/pytorch-image-models/scale_image_alexnet/scale_454_alex_size_454.err
+#SBATCH -J image_alex_size_0.08_validation
+#SBATCH -o /users/xyu110/pytorch-image-models/alex0.08_validation.out
+#SBATCH -e /users/xyu110/pytorch-image-models/alex0.08_validation.err
 #SBATCH --account=carney-tserre-condo
 
 #SBATCH --mail-user=xizheng_yu@brown.edu
@@ -19,20 +19,31 @@ conda activate env_default
 
 cd /users/xyu110/pytorch-image-models
 
+# add for loop to run multiple scales
+for imgscale in 160 192 227 270 321 382 454
+do
+    for alexscale in 160 192 227 270 321 382 454
+    do
+        if [ $imgscale -le $alexscale ]
+        then
+            sh distributed_val.sh 2 validate.py \
+                --data-dir /gpfs/data/tserre/data/ImageNet/ILSVRC/Data/CLS-LOC \
+                --model alexnet \
+                -b 128 \
+                --image-scale 3 $imgscale $imgscale \
+                --input-size 3 $alexscale $alexscale \
+                --pretrained \
+                --checkpoint /oscar/data/tserre/xyu110/pytorch-output/train/alexnet_size_${alexscale}_scale_0.08/last.pth.tar \
+                --results-file /oscar/data/tserre/xyu110/pytorch-output/train/scale_image_alexnet_0.08/scale_${imgscale}_alex_size_${alexscale}.txt
+            wait
+        fi
+    done
+done
+
 # sh distributed_val.sh 2 validate.py \
-#     --data-dir /gpfs/data/tserre/data/ImageNet/ILSVRC/Data/CLS-LOC \
-#     --model HMAX_from_Alexnet \
-#     -b 128 \
-#     --image-scale 3 454 454 \
-#     --input-size 3 454 454 \
-#     --pretrained \
-#     --checkpoint /users/xyu110/pytorch-image-models/alexnet_size_454/last.pth.tar \
-
-
-sh distributed_val.sh 2 validate.py \
-    --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
-    --model hmax_from_alexnet \
-    --input-size 3 227 227 \
-    --image-scale 3 192 192 \
-    -b 32 \
-    --checkpoint /gpfs/data/tserre/npant1/pytorch-output/train/hmax_from_alexnetv2/model_best.pth.tar
+#     --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
+#     --model hmax_from_alexnet \
+#     --input-size 3 227 227 \
+#     --image-scale 3 192 192 \
+#     -b 32 \
+#     --checkpoint /gpfs/data/tserre/npant1/pytorch-output/train/hmax_from_alexnetv2/model_best.pth.tar

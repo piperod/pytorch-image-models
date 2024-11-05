@@ -244,94 +244,94 @@ class HMAX(nn.Module):
         return x    
 
 #########################################################################################################
-# class HMAX_bypass(nn.Module):
-#     def __init__(self,
-#                 #  args,
-#                  in_chans=3,
-#                  s1_channels_out=96,
-#                  s1_scale=15,
-#                  s1_stride=1,
-#                  s2b_kernel_size=[4,8,12,16],
-#                  s2b_channels_out=128,
-#                  hidden_dim=1024,
-#                  num_classes=1000,
-#                  drop_rate=0.5,
-#                  drop_path_rate=0.5,
-#                  bypass_only=False,
-#                  ):
+class HMAX_bypass(nn.Module):
+    def __init__(self,
+                #  args,
+                 in_chans=3,
+                 s1_channels_out=96,
+                 s1_scale=15,
+                 s1_stride=1,
+                 s2b_kernel_size=[4,8,12,16],
+                 s2b_channels_out=128,
+                 hidden_dim=1024,
+                 num_classes=1000,
+                 drop_rate=0.5,
+                 drop_path_rate=0.5,
+                 bypass_only=False,
+                 ):
         
-#         self.in_chans=in_chans
-#         self.s1_channels_out=s1_channels_out
-#         self.s1_scale=s1_scale
-#         self.s1_stride=s1_stride
-#         self.s2b_kernel_size=s2b_kernel_size
-#         self.s2b_channels_out= s2b_channels_out
-#         self.num_classes=num_classes
-#         self.drop_rate=drop_rate
-#         self.drop_path_rate=drop_path_rate
-#         self.hidden_dim=hidden_dim
+        self.in_chans=in_chans
+        self.s1_channels_out=s1_channels_out
+        self.s1_scale=s1_scale
+        self.s1_stride=s1_stride
+        self.s2b_kernel_size=s2b_kernel_size
+        self.s2b_channels_out= s2b_channels_out
+        self.num_classes=num_classes
+        self.drop_rate=drop_rate
+        self.drop_path_rate=drop_path_rate
+        self.hidden_dim=hidden_dim
 
-#         super(HMAX_bypass, self).__init__()
-# #########################################################################################################
+        super(HMAX_bypass, self).__init__()
+#########################################################################################################
 
-#         self.conv1 = nn.Conv2d(in_chans, self.s1_channels_out, kernel_size=self.s1_scale, stride=self.s1_stride, padding='valid')
-#         self.batchnorm1 = nn.Sequential(nn.BatchNorm2d(self.s1_channels_out, 1e-3),
-#                                     nn.ReLU(True),
-#                                     )
+        self.conv1 = nn.Conv2d(in_chans, self.s1_channels_out, kernel_size=self.s1_scale, stride=self.s1_stride, padding='valid')
+        self.batchnorm1 = nn.Sequential(nn.BatchNorm2d(self.s1_channels_out, 1e-3),
+                                    nn.ReLU(True),
+                                    )
 
-#         self.s2b_seqs = nn.ModuleList()
-#         for size in self.s2b_kernel_size:
-#             self.s2b_seqs.append(nn.Sequential(
-#                 nn.Conv2d(self.s1_channels_out, self.s2b_channels_out, kernel_size=size, stride=1, padding=size//2),
-#                 nn.BatchNorm2d(self.s2b_channels_out, 1e-3),
-#                 nn.ReLU(True)
-#             ))        
+        self.s2b_seqs = nn.ModuleList()
+        for size in self.s2b_kernel_size:
+            self.s2b_seqs.append(nn.Sequential(
+                nn.Conv2d(self.s1_channels_out, self.s2b_channels_out, kernel_size=size, stride=1, padding=size//2),
+                nn.BatchNorm2d(self.s2b_channels_out, 1e-3),
+                nn.ReLU(True)
+            ))        
 
-#         self.classifier = nn.Sequential(
-#                                         # nn.Dropout(0.5),
-#                                         nn.Linear(self.get_s4_in_channels(), self.hidden_dim),  # fc1
-#                                         # nn.Dropout(0.2),
-#                                         nn.Linear(self.hidden_dim, 1024),  # fc2
-#                                         nn.Linear(1024, self.num_classes)  # fc3
-#                                         )
+        self.classifier = nn.Sequential(
+                                        # nn.Dropout(0.5),
+                                        nn.Linear(self.get_s4_in_channels(), self.hidden_dim),  # fc1
+                                        # nn.Dropout(0.2),
+                                        nn.Linear(self.hidden_dim, 1024),  # fc2
+                                        nn.Linear(1024, self.num_classes)  # fc3
+                                        )
 
 
-#     def get_s4_in_channels(self):
+    def get_s4_in_channels(self):
         
-#         s1_out_size = ((224 - self.s1_scale) // self.s1_stride) + 1
-#         c1_out_size = ((s1_out_size - 14) // 1) + 1
-#         s2b_out_size = (c1_out_size + 1) ## this is currently true because padding + stride 1
-#         c2b_out_size = ((s2b_out_size - 12) // 6) + 1
+        s1_out_size = ((224 - self.s1_scale) // self.s1_stride) + 1
+        c1_out_size = ((s1_out_size - 14) // 1) + 1
+        s2b_out_size = (c1_out_size + 1) ## this is currently true because padding + stride 1
+        c2b_out_size = ((s2b_out_size - 12) // 6) + 1
 
-#         c2b_out = len(self.s2b_kernel_size) * self.s2b_channels_out * c2b_out_size * c2b_out_size
-#         s4_in = c2b_out
+        c2b_out = len(self.s2b_kernel_size) * self.s2b_channels_out * c2b_out_size * c2b_out_size
+        s4_in = c2b_out
 
-#         return s4_in
+        return s4_in
 
-#     def forward(self, x):
-#         x = self.conv1(x)
-#         x = self.batchnorm1(x)
-#         x = F.max_pool2d(x, kernel_size=14, stride=1)
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.batchnorm1(x)
+        x = F.max_pool2d(x, kernel_size=14, stride=1)
 
-#         x = torch.cat([seq(x) for seq in self.s2b_seqs], dim=1)
-#         x = F.max_pool2d(x, kernel_size=12, stride=6)
-#         x = torch.flatten(x, start_dim=1)
-#         x = self.classifier(x)
-#         return x    
+        x = torch.cat([seq(x) for seq in self.s2b_seqs], dim=1)
+        x = F.max_pool2d(x, kernel_size=12, stride=6)
+        x = torch.flatten(x, start_dim=1)
+        x = self.classifier(x)
+        return x    
 
-# def pad_to_size(a, size):
-#     current_size = (a.shape[-2], a.shape[-1])
-#     total_pad_h = size[0] - current_size[0]
-#     pad_top = total_pad_h // 2
-#     pad_bottom = total_pad_h - pad_top
+def pad_to_size(a, size):
+    current_size = (a.shape[-2], a.shape[-1])
+    total_pad_h = size[0] - current_size[0]
+    pad_top = total_pad_h // 2
+    pad_bottom = total_pad_h - pad_top
 
-#     total_pad_w = size[1] - current_size[1]
-#     pad_left = total_pad_w // 2
-#     pad_right = total_pad_w - pad_left
+    total_pad_w = size[1] - current_size[1]
+    pad_left = total_pad_w // 2
+    pad_right = total_pad_w - pad_left
 
-#     a = nn.functional.pad(a, (pad_left, pad_right, pad_top, pad_bottom))
+    a = nn.functional.pad(a, (pad_left, pad_right, pad_top, pad_bottom))
 
-#     return a
+    return a
 
 
 
@@ -660,7 +660,7 @@ import random
 import torchvision
 
 class CHMAX(nn.Module):
-    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, hmax_type="full"):
+    def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, hmax_type="full", **kwags):
         super(CHMAX, self).__init__()
 
         # the below line is so that the training script calculates the loss correctly

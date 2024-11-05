@@ -469,7 +469,7 @@ def main():
             num_classes=-1,  # force head adaptation
         )
 
-    args.model_kwargs['image_size'] = args.input_size[-1]
+    args.model_kwargs['channel_size'] = args.input_size[-1]
 
     model = create_model(
         args.model,
@@ -1017,7 +1017,7 @@ def train_one_epoch(
             # with amp_autocast():
             try:
                 if model.module.contrastive_loss:
-                    print("running with contrastive loss")
+                    # print("running with contrastive loss")
                     output, scale_loss = model(input)
                     loss = loss_fn(output, target) + (args.cl_lambda*scale_loss)
             # default normal model behavior
