@@ -21,7 +21,7 @@ sh distributed_train.sh 2 train_skeleton.py \
     --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
     --dataset torch/imagenet \
     --model chmax \
-    --model-kwargs ip_scale_bands=2 classifier_input_size=6400 hmax_type='bypass'\
+    --model-kwargs ip_scale_bands=2 classifier_input_size=6400 hmax_type='bypass' contrastive_loss=False\
     --opt sgd \
     -b 128 \
     --epochs 90 \

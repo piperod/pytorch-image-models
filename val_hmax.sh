@@ -31,7 +31,7 @@ do
         fi
 
         sh distributed_val.sh 2 validate.py \
-            --data-dir /gpfs/data/tserre/data/ImageNet/ILSVRC/Data/CLS-LOC \
+            --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
             --model chmax \
             --model-kwargs ip_scale_bands=${ip_band} classifier_input_size=${size} hmax_type='bypass'\
             -b 128 \
