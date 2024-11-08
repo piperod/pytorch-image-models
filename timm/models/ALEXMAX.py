@@ -566,6 +566,7 @@ def checkpoint_filter_fn(state_dict, model: nn.Module):
 
 @register_model
 def alexmax(pretrained=False, **kwargs):
+    #deleting some kwargs that are messing up training 
     try:
         del kwargs["pretrained_cfg"]
         del kwargs["pretrained_cfg_overlay"]
