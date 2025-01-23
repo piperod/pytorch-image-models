@@ -16,6 +16,7 @@ Hacked together by / Copyright 2020 Ross Wightman (https://github.com/rwightman)
 """
 import argparse
 import importlib
+import random
 import json
 import logging
 import os
@@ -25,10 +26,17 @@ from collections import OrderedDict
 from contextlib import suppress
 from datetime import datetime
 from functools import partial
+import matplotlib.pyplot as plt
+import torchvision.utils as vutils
+import numpy as np
 
 import torch
 import torch.nn as nn
 import torchvision.utils
+import torch.nn.functional as F
+from torch.utils.data import Subset
+import schedulefree
+
 import yaml
 from torch.nn.parallel import DistributedDataParallel as NativeDDP
 
@@ -40,6 +48,9 @@ from timm.models import create_model, safe_model_name, resume_checkpoint, load_c
 from timm.optim import create_optimizer_v2, optimizer_kwargs
 from timm.scheduler import create_scheduler_v2, scheduler_kwargs
 from timm.utils import ApexScaler, NativeScaler
+
+from pad import *
+
 
 try:
     from apex import amp
@@ -392,6 +403,10 @@ group.add_argument('--use-multi-epochs-loader', action='store_true', default=Fal
                    help='use the multi-epochs-loader to save time at the beginning of every epoch')
 # group.add_argument('--log-wandb', action='store_true', default=False,
 #                    help='log training and validation metrics to wandb')
+group.add_argument('--add-wrapped-dataloader', action='store_true', default=False)
+group.add_argument('--add-wrapped-schedulefree', action='store_true', default=False)
+
+
 
 
 def _parse_args():
@@ -563,11 +578,23 @@ def main():
     #             f'Learning rate ({args.lr}) calculated from base learning rate ({args.lr_base}) '
     #             f'and effective global batch size ({global_batch_size}) with {args.lr_base_scale} scaling.')
 
-    optimizer = create_optimizer_v2(
-        model,
-        **optimizer_kwargs(cfg=args),
-        **args.opt_kwargs,
-    )
+
+
+
+    if args.add_wrapped_schedulefree:
+        optimizer = schedulefree.SGDScheduleFree(
+            model.parameters(),
+            lr = args.lr,
+        )
+        # optimizer = schedulefree.ScheduleFreeWrapper(
+        #     optimizer
+        # )
+    else:
+        optimizer = create_optimizer_v2(
+            model,
+            **optimizer_kwargs(cfg=args),
+            **args.opt_kwargs,
+        )
 
     # setup automatic mixed-precision (AMP) loss scaling and op casting
     amp_autocast = suppress  # do nothing
@@ -742,6 +769,25 @@ def main():
         worker_seeding=args.worker_seeding,
     )
 
+    # take part of the loader_train for debugging
+
+    target_size = tuple(data_config['input_size'][1:])  # Assuming input_size is (C, H, W)
+    
+    if args.add_wrapped_dataloader:
+        print("Using Zoom Out Padding!")
+        transform = RandomResizePad(original_size=target_size, min_size=160)
+        loader_train = DataLoaderTransformWrapper(loader_train, transform)
+
+    visualize = False
+    if visualize == True:
+        visualize_dataloader_samples(
+            loader=loader_train,
+            target_size=target_size,
+            num_images=16,
+            save_path=f'train_dataloader_samples_{target_size}.png'
+        )
+        exit(0)
+
     loader_eval = None
     if args.val_split:
         eval_workers = args.workers
@@ -763,6 +809,8 @@ def main():
             device=device,
             use_prefetcher=args.prefetcher,
         )
+        if args.add_wrapped_dataloader:
+            loader_eval = DataLoaderTransformWrapper(loader_eval, transform)
 
     # setup loss function
     # if args.jsd_loss:
@@ -853,7 +901,11 @@ def main():
     #         lr_scheduler.step(start_epoch)
 
     if utils.is_primary(args):
-        _logger.info(
+        if args.add_wrapped_schedulefree:
+            lr_scheduler = None
+            _logger.info(f'Scheduled epochs: {num_epochs}. Using ScheduleFree optimizer.')
+        else:
+            _logger.info(
             f'Scheduled epochs: {num_epochs}. LR stepped per {"epoch" if lr_scheduler.t_in_epochs else "update"}.')
     
     results = []
@@ -888,14 +940,25 @@ def main():
             #     utils.distribute_bn(model, args.world_size, args.dist_bn == 'reduce')
 
             if loader_eval is not None:
-                eval_metrics = validate(
-                    model,
-                    loader_eval,
-                    validate_loss_fn,
-                    args,
-                    device=device,
-                    amp_autocast=amp_autocast,
-                )
+                if args.add_wrapped_schedulefree:
+                    eval_metrics = validate(
+                        model,
+                        loader_eval,
+                        validate_loss_fn,
+                        args,
+                        device=device,
+                        amp_autocast=amp_autocast,
+                        optimizer=optimizer
+                    )
+                else:
+                    eval_metrics = validate(
+                        model,
+                        loader_eval,
+                        validate_loss_fn,
+                        args,
+                        device=device,
+                        amp_autocast=amp_autocast,
+                    )
 
                 # if model_ema is not None and not args.model_ema_force_cpu:
                 #     if args.distributed and args.dist_bn in ('broadcast', 'reduce'):
@@ -987,6 +1050,8 @@ def train_one_epoch(
     losses_m = utils.AverageMeter()
 
     model.train()
+    if args.add_wrapped_schedulefree:
+        optimizer.train()
 
     accum_steps = 1 #args.grad_accum_steps
     # last_accum_steps = len(loader) % accum_steps
@@ -1089,8 +1154,11 @@ def train_one_epoch(
         # update_start_time = time_now
 
         if update_idx % args.log_interval == 0:
-            lrl = [param_group['lr'] for param_group in optimizer.param_groups]
-            lr = sum(lrl) / len(lrl)
+            if args.add_wrapped_schedulefree:
+                lr = optimizer.defaults['lr']  # Get learning rate from ScheduleFree
+            else:
+                lrl = [param_group['lr'] for param_group in optimizer.param_groups]
+                lr = sum(lrl) / len(lrl)
 
             if args.distributed:
                 reduced_loss = utils.reduce_tensor(loss.data, args.world_size)
@@ -1140,7 +1208,8 @@ def validate(
         args,
         device=torch.device('cuda'),
         amp_autocast=suppress,
-        log_suffix=''
+        log_suffix='',
+        optimizer=None,
 ):
     batch_time_m = utils.AverageMeter()
     losses_m = utils.AverageMeter()
@@ -1148,6 +1217,8 @@ def validate(
     top5_m = utils.AverageMeter()
 
     model.eval()
+    if args.add_wrapped_schedulefree:
+        optimizer.eval()
 
     end = time.time()
     last_idx = len(loader) - 1

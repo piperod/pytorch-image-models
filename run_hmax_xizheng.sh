@@ -3,7 +3,7 @@
 #SBATCH -p gpu --gres=gpu:2
 #SBATCH -n 4
 #SBATCH -N 1
-#SBATCH --mem=80GB
+#SBATCH --mem=60GB
 #SBATCH -o hmax_ip_2.out
 #SBATCH -e hmax_ip_2.err
 #SBATCH --account=carney-tserre-condo
@@ -21,7 +21,7 @@ sh distributed_train.sh 2 train_skeleton.py \
     --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
     --dataset torch/imagenet \
     --model chmax \
-    --model-kwargs ip_scale_bands=2 classifier_input_size=6400 hmax_type='bypass' contrastive_loss=False\
+    --model-kwargs ip_scale_bands=2 classifier_input_size=4096 hmax_type='bypass' contrastive_loss=False\
     --opt sgd \
     -b 128 \
     --epochs 90 \
@@ -36,5 +36,5 @@ sh distributed_train.sh 2 train_skeleton.py \
     --train-crop-mode rrc\
     --input-size 3 227 227\
     --scale 1.0 1.0 \
-    --experiment hmax_ip_2 \
+    --experiment hmax_ip_2_wo_cl \
     --output /gpfs/data/tserre/xyu110/pytorch-output/train \

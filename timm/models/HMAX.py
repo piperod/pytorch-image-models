@@ -15,7 +15,6 @@ from ._manipulate import checkpoint_seq
 from ._registry import register_model, generate_default_cfgs
 
 
-__all__ = ["HMAX", "HMAX_bypass", "HMAX_from_Alexnet", "hmax_from_alexnet", "hmax_full", "hmax_bypass"]
 
 def get_gabor(l_size, la, si, n_ori, aspect_ratio):
     """generate the gabor filters
@@ -465,9 +464,9 @@ import torchvision
 class CHMAX(nn.Module):
     def __init__(self, num_classes=1000, in_chans=3, ip_scale_bands=1, classifier_input_size=13312, hmax_type="full", **kwargs):
         super(CHMAX, self).__init__()
-        print(kwargs)
+
         # the below line is so that the training script calculates the loss correctly
-        self.contrastive_loss = kwargs["contrastive_loss"]
+        self.contrastive_loss = kwargs['contrastive_loss']
         if hmax_type == "full":
             self.model_backbone = HMAX_from_Alexnet(num_classes=num_classes,
                                                         in_chans=in_chans,
@@ -555,6 +554,5 @@ def chmax(pretrained=False, **kwargs):
         pass
     model = CHMAX(**kwargs)
     if pretrained:
-        pass
-        # raise NotImplementedError
+        raise NotImplementedError
     return model

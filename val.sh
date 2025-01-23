@@ -33,17 +33,19 @@ do
                 --image-scale 3 $imgscale $imgscale \
                 --input-size 3 $alexscale $alexscale \
                 --pretrained \
-                --checkpoint /oscar/data/tserre/xyu110/pytorch-output/train/alexnet_size_${alexscale}_scale_0.08/last.pth.tar \
-                --results-file /oscar/data/tserre/xyu110/pytorch-output/train/scale_image_alexnet_0.08/scale_${imgscale}_alex_size_${alexscale}.txt
+                --checkpoint /oscar/data/tserre/xyu110/pytorch-output/train/alexnet_size_zoom_out_${alexscale}/last.pth.tar \
+                --results-file /oscar/data/tserre/xyu110/pytorch-output/train/alexnet_zoom_out/scale_${imgscale}_alex_size_${alexscale}.txt
             wait
         fi
     done
 done
 
 # sh distributed_val.sh 2 validate.py \
-#     --data-dir /gpfs/data/tserre/npant1/ILSVRC/ \
-#     --model hmax_from_alexnet \
+#     --data-dir /gpfs/data/tserre/data/ImageNet/ILSVRC/Data/CLS-LOC \
+#     --model alexnet \
+#     -b 128 \
 #     --input-size 3 227 227 \
-#     --image-scale 3 192 192 \
-#     -b 32 \
-#     --checkpoint /gpfs/data/tserre/npant1/pytorch-output/train/hmax_from_alexnetv2/model_best.pth.tar
+#     --image-scale 3 160 160 \
+#     --pretrained \
+#     --checkpoint /oscar/data/tserre/xyu110/pytorch-output/train/alexnet_size_227_scale_0.08/last.pth.tar \
+#     --results-file /oscar/data/tserre/xyu110/pytorch-output/train/scale_image_alexnet_0.08/scale_227_alex_size_$
