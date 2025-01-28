@@ -100,9 +100,22 @@ venv.bak/
 # PyCharm
 .idea
 
+output/
+
 # PyTorch weights
 *.tar
 *.pth
+*.pt
+*.torch
 *.gz
 Untitled.ipynb
 Testing notebook.ipynb
+
+# Root dir exclusions
+/*.csv
+/*.yaml
+/*.json
+/*.jpg
+/*.png
+/*.zip
+/*.tar.*
